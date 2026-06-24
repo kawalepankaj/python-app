@@ -45,7 +45,7 @@ pipeline {
 
     stage('Checkout') {
       steps {
-        checkout scm
+        git url: 'https://github.com/kawalepankaj/python-app.git', branch: 'master', credentialsId: 'git_cred'
         script {
           def shortSha = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
           env.GIT_SHA = shortSha
@@ -90,7 +90,7 @@ pipeline {
 
     stage('Push Image') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'docker-registry-creds', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
+        withCredentials([usernamePassword(credentialsId: 'Docker_Cred', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh '''
             echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USER" --password-stdin
             docker push "$IMAGE"
