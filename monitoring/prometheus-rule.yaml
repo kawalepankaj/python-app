@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sample-fastapi-app
+  labels:
+    app.kubernetes.io/name: sample-fastapi-app
+    release: prometheus
+spec:
+  groups:
+    - name: sample-fastapi-app.rules
+      rules:
+        - alert: SampleFastapiAppHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total[5m])), 1)
+            > 0.05
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: sample-fastapi-app high 5xx error rate
+            description: More than 5 percent of requests are returning 5xx responses.
+        - alert: SampleFastapiAppHighLatency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+            ) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: sample-fastapi-app high p95 latency
+            description: p95 request latency is above 1 second.
