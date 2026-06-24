@@ -32,7 +32,10 @@ spec:
           type: RuntimeDefault
       containers:
         - name: app
-          image: docker.io/kawalepankaj/python-app:latest
+          # Image tag is dynamically set by Jenkins: BUILD_NUMBER-GIT_SHA
+          # See .env file for configuration: REGISTRY, IMAGE_REPOSITORY
+          # Jenkins updates this via: kubectl set image deployment/sample-fastapi-app app="$IMAGE"
+          image: ${IMAGE_TAG}
           imagePullPolicy: Always
           ports:
             - name: http

@@ -19,14 +19,36 @@ pipeline {
     APP_DIR = 'app'
     IMAGE = ''
     LATEST_IMAGE = ''
+    GIT_SHA = ''
   }
 
   stages {
+    stage('Load Configuration') {
+      steps {
+        script {
+          // Load configuration from .env file
+          def envContent = readFile('.env').trim()
+          envContent.split('\n').each { line ->
+            if (!line.startsWith('#') && line.contains('=')) {
+              def parts = line.split('=', 2)
+              def key = parts[0].trim()
+              def value = parts[1].trim()
+              // Skip variable references, use actual values for REGISTRY and IMAGE_REPOSITORY
+              if (!value.contains('$')) {
+                env[key] = value
+              }
+            }
+          }
+        }
+      }
+    }
+
     stage('Checkout') {
       steps {
         checkout scm
         script {
           def shortSha = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+          env.GIT_SHA = shortSha
           env.IMAGE = "${params.REGISTRY}/${params.IMAGE_REPOSITORY}:${env.BUILD_NUMBER}-${shortSha}"
           env.LATEST_IMAGE = "${params.REGISTRY}/${params.IMAGE_REPOSITORY}:latest"
         }
