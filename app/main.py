@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import socket  # <-- Added socket module
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -12,7 +13,8 @@ from pydantic import BaseModel
 
 
 APP_NAME = os.getenv("APP_NAME", "sample-fastapi-app")
-APP_ENV = os.getenv("APP_ENV", "local")
+# 👇 Changed APP_ENV to dynamically use the machine's hostname
+APP_ENV = socket.gethostname() 
 APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
