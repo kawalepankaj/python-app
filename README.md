@@ -83,6 +83,8 @@ The [Jenkinsfile](./Jenkinsfile) performs:
 6. Deploy to Kubernetes using plain manifest files
 7. Verify rollout status
 
+This pipeline is intended for a Linux Jenkins agent. The agent should have `python3`, `python3-venv`, `docker`, and `kubectl` installed, and the Jenkins user must be allowed to run Docker commands.
+
 Required Jenkins credentials:
 
 - `docker-registry-creds`: username/password credential for Docker Hub. Use Docker Hub username `kawalepankaj` and a Docker access token as the password.
