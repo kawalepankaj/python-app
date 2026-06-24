@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-import socket  # <-- Added socket module
+import socket
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -11,13 +11,23 @@ from fastapi import FastAPI, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel
 
-
-APP_NAME = os.getenv("APP_NAME", "sample-fastapi-app")
-# 👇 Changed APP_ENV to dynamically use the machine's hostname
-APP_ENV = socket.gethostname() 
-APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+# 1. Setup Logging at the module level (before FastAPI initialization)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger(__name__)
 
+# 2. Configuration Env Vars
+APP_NAME = os.getenv("APP_NAME", "fastapi-app")
+# Use a separate variable for stage environment checks, defaulting to hostname if empty
+DEPLOY_ENV = os.getenv("APP_ENV", "local").lower() 
+HOSTNAME = socket.gethostname()
+
+APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+
+# 3. Prometheus Metrics Setup
 REQUEST_COUNT = Counter(
     "http_requests_total",
     "Total HTTP requests.",
@@ -39,14 +49,11 @@ class AppInfo(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    logging.basicConfig(
-        level=LOG_LEVEL,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
-    logging.getLogger(__name__).info(
-        "starting app=%s env=%s version=%s",
+    logger.info(
+        "starting app=%s env=%s host=%s version=%s",
         APP_NAME,
-        APP_ENV,
+        DEPLOY_ENV,
+        HOSTNAME,
         APP_VERSION,
     )
     yield
@@ -56,7 +63,8 @@ app = FastAPI(
     title=APP_NAME,
     version=APP_VERSION,
     lifespan=lifespan,
-    docs_url="/docs" if APP_ENV != "production" else None,
+    # Explicitly check your deployment environment variable instead of the system hostname
+    docs_url="/docs" if DEPLOY_ENV != "production" else None,
     redoc_url=None,
 )
 
@@ -66,11 +74,19 @@ async def metrics_and_security_headers(request: Request, call_next):
     start = time.perf_counter()
     response = await call_next(request)
     duration = time.perf_counter() - start
-    path = request.scope.get("route").path if request.scope.get("route") else request.url.path
+    
+    # Safely extract the matched route template to prevent high-cardinality issues
+    route = request.scope.get("route")
+    if route and hasattr(route, "path"):
+        path = route.path
+    else:
+        # If no route matches (e.g. 404), group under a generic label instead of raw URL
+        path = "not_found"
 
     REQUEST_COUNT.labels(request.method, path, str(response.status_code)).inc()
     REQUEST_LATENCY.labels(request.method, path).observe(duration)
 
+    # Security Headers
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -81,7 +97,7 @@ async def metrics_and_security_headers(request: Request, call_next):
 async def root() -> AppInfo:
     return AppInfo(
         name=APP_NAME,
-        environment=APP_ENV,
+        environment=HOSTNAME,  # Serving the requested hostname here
         version=APP_VERSION,
         status="running",
     )
@@ -97,7 +113,7 @@ async def readyz() -> dict[str, str]:
     return {
         "status": "ready",
         "app": APP_NAME,
-        "environment": APP_ENV,
+        "environment": HOSTNAME,
     }
 
 
