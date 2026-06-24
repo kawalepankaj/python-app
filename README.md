@@ -67,8 +67,8 @@ pytest -q
 
 ```bash
 cd app
-docker build -t sample-fastapi-app:local .
-docker run --rm -p 3000:3000 --env-file .env.example sample-fastapi-app:local
+docker build -t docker.io/kawalepankaj/python-app:latest .
+docker run --rm -p 3000:3000 --env-file .env.example docker.io/kawalepankaj/python-app:latest
 ```
 
 ## Jenkins CI/CD Flow

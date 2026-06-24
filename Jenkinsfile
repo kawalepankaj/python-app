@@ -18,6 +18,7 @@ pipeline {
   environment {
     APP_DIR = 'app'
     IMAGE = ''
+    LATEST_IMAGE = ''
   }
 
   stages {
@@ -27,6 +28,7 @@ pipeline {
         script {
           def shortSha = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
           env.IMAGE = "${params.REGISTRY}/${params.IMAGE_REPOSITORY}:${env.BUILD_NUMBER}-${shortSha}"
+          env.LATEST_IMAGE = "${params.REGISTRY}/${params.IMAGE_REPOSITORY}:latest"
         }
       }
     }
@@ -48,7 +50,7 @@ pipeline {
 
     stage('Build Image') {
       steps {
-        sh 'docker build --pull -t "$IMAGE" "$APP_DIR"'
+        sh 'docker build --pull -t "$IMAGE" -t "$LATEST_IMAGE" "$APP_DIR"'
       }
     }
 
@@ -70,6 +72,7 @@ pipeline {
           sh '''
             echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USER" --password-stdin
             docker push "$IMAGE"
+            docker push "$LATEST_IMAGE"
           '''
         }
       }
