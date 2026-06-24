@@ -60,7 +60,7 @@ pipeline {
           // Fix permissions on any files left from previous builds (especially from Docker root user)
           sh '''
             # Force remove problematic cache directories
-            rm -rf .git .pytest_cache __pycache__ app/tests/__pycache__ app/.pytest_cache 2>/dev/null || true
+            rm -rf .git .pytest_cache __pycache__ app/tests/__pycache__ app/.pytest_cache app/.ruff_cache 2>/dev/null || true
             # Fix permissions on remaining files
             find . -type d -exec chmod 777 {} + 2>/dev/null || true
             find . -type f -exec chmod 666 {} + 2>/dev/null || true
@@ -94,6 +94,14 @@ pipeline {
             PYTHONPATH=. pytest -q
           '''
         }
+        // Fix permissions on caches created by root BEFORE exiting Docker container
+        sh '''
+          find . -name ".pytest_cache" -type d -exec chmod -R 777 {} + 2>/dev/null || true
+          find . -name "__pycache__" -type d -exec chmod -R 777 {} + 2>/dev/null || true
+          find . -name ".ruff_cache" -type d -exec chmod -R 777 {} + 2>/dev/null || true
+          find . -type d -exec chmod 777 {} + 2>/dev/null || true
+          find . -type f -exec chmod 666 {} + 2>/dev/null || true
+        '''
       }
     }
 
@@ -110,8 +118,6 @@ pipeline {
           
           # Construct image tags
           IMAGE="${REGISTRY}/${IMAGE_REPOSITORY}:${BUILD_NUMBER}-${GIT_SHA}"
-          LATEST_IMAGE="${REGISTRY}/${IMAGE_REPOSITORY}:latest"
-          
           echo "========== Build Configuration =========="
           echo "REGISTRY: $REGISTRY"
           echo "IMAGE_REPOSITORY: $IMAGE_REPOSITORY"
@@ -122,14 +128,8 @@ pipeline {
           echo "APP_DIR: $APP_DIR"
           echo "=========================================="
           
-          # Validate tags before building
-          if [ -z "$IMAGE" ] || [ -z "$LATEST_IMAGE" ]; then
-            echo "ERROR: Image tags are empty!"
-            exit 1
-          fi
-          
           # Build image with both tags
-          docker build --pull -t "$IMAGE" -t "$LATEST_IMAGE" "$APP_DIR"
+          docker build --pull -t "$IMAGE" "$APP_DIR"
         '''
       }
     }
@@ -159,7 +159,6 @@ pipeline {
             
             echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USER" --password-stdin
             docker push "$IMAGE"
-            docker push "$LATEST_IMAGE"
           '''
         }
       }
@@ -189,9 +188,10 @@ pipeline {
   post {
     always {
       sh '''
-        # Fix permissions on pytest cache created by root in docker
+        # Fix permissions on caches created by root in docker
         find . -name ".pytest_cache" -type d -exec chmod -R 777 {} + 2>/dev/null || true
         find . -name "__pycache__" -type d -exec chmod -R 777 {} + 2>/dev/null || true
+        find . -name ".ruff_cache" -type d -exec chmod -R 777 {} + 2>/dev/null || true
         docker logout "$REGISTRY" || true
       '''
       cleanWs(deleteDirs: true)
